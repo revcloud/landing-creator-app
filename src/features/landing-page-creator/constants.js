@@ -15,7 +15,7 @@ export const templates = [
     id: "template-1",
     name: "Template 1",
     screenshot: "/screenshots/template-1.png",
-    previewUrl: "https://cashoffertemplate1.vercel.app",
+    previewUrl: "https://landing-1-default.vercel.app/",
   },
   {
     id: "template-2",

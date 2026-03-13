@@ -59,7 +59,7 @@ function Sidebar({ activeField, config, onChange, onClose }) {
     setUploadError(null);
     setUploadingField(field);
     try {
-      const res = await fetch("http://localhost:3500/api/dlpc/upload", {
+      const res = await fetch("https://api-stage.palisade.ai/api/dlpc/upload", {
         method: "POST",
         headers: {
           "Content-Type": "application/json",

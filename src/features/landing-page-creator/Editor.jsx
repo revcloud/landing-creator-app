@@ -3,7 +3,7 @@ import { useNavigate } from "react-router-dom";
 import Sidebar from "./Sidebar";
 
 async function deployToVercel(templateId, config) {
-  const url = "http://localhost:3500/api/dlpc/deploy";
+  const url = "https://api-stage.palisade.ai/api/dlpc/deploy";
   const res = await fetch(url, {
     method: "POST",
     headers: {
