@@ -24,3 +24,20 @@ export const templates = [
     previewUrl: "https://template-2-preview.vercel.app",
   },
 ];
+
+export const defaultConfig = {
+  hero: {
+    heading: "",
+    subheading: "",
+    ctaText: "",
+    ctaColor: "#6366f1",
+  },
+  brand: {
+    logo: null,
+    name: "",
+    title: "",
+    favicon: null,
+  },
+};
+
+export const editStatusValues = ["idle", "submitting", "building", "live"];
