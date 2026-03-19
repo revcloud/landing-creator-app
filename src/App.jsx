@@ -10,8 +10,17 @@ import TemplateGallery from "./features/landing-page-creator/TemplateGallery";
 import { templates } from "./features/landing-page-creator/constants";
 
 function EditorRoute() {
-  const { state } = useLocation();
-  const template = state?.template;
+  const location = useLocation();
+  const { state } = location;
+
+  const templateIdFromQuery = new URLSearchParams(location.search).get(
+    "templateId",
+  );
+  const templateFromQuery = templates.find(
+    (t) => t.id === templateIdFromQuery,
+  );
+
+  const template = state?.template ?? templateFromQuery;
   if (!template) {
     return <Navigate to="/" replace />;
   }
