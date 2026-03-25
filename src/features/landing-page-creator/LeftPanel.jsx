@@ -15,6 +15,7 @@ function LeftPanel({
   onConfigClose,
   editStatus,
   onPromptSubmit,
+  onDeploy,
   onBack,
 }) {
   const isEditorUiLocked = editStatus !== "idle" || initStatus !== "ready";
@@ -24,6 +25,9 @@ function LeftPanel({
         template={template}
         initStatus={initStatus}
         deploymentUrl={deploymentUrl}
+        editStatus={editStatus}
+        disabled={isEditorUiLocked}
+        onDeploy={onDeploy}
         onBack={onBack}
       />
 

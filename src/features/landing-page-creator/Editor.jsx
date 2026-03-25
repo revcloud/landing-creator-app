@@ -224,7 +224,7 @@ function Editor({ template }) {
 
       setEditStatus("building");
       updateMessageById(systemMessageId, {
-        text: "Building the updated landing page...",
+        text: "Building changes...",
         status: "building",
       });
 
@@ -292,9 +292,8 @@ function Editor({ template }) {
       }
       setEditStatus("live");
       updateMessageById(systemMessageId, {
-        text: "Your landing page is live.",
+        text: "Changes are live.",
         status: "live",
-        url: liveUrl,
       });
 
       setEditStatus("idle");
@@ -302,6 +301,71 @@ function Editor({ template }) {
       updateMessageById(systemMessageId, {
         role: "error",
         text: err?.message ?? "Edit failed",
+        status: undefined,
+      });
+      setEditStatus("idle");
+    }
+  };
+
+  const handleDeployConfig = async () => {
+    if (initStatus !== "ready" || editStatus !== "idle") return;
+    if (!template?.id) return;
+
+    const systemMessageId = createId();
+
+    setEditStatus("building");
+    setMessages((prev) => [
+      ...prev,
+      {
+        id: systemMessageId,
+        role: "system",
+        text: "Deploying current configuration...",
+        status: "building",
+      },
+    ]);
+
+    try {
+      const deployResult = await deployTemplate({
+        templateId: template.id,
+        config,
+        userId: TEMP_USER_ID,
+      });
+
+      let liveUrl = deployResult?.url;
+
+      if (deployResult?.deploymentId) {
+        setMessages((prev) =>
+          prev.map((m) =>
+            m.id === systemMessageId
+              ? { ...m, text: "Waiting for deployment to become live..." }
+              : m,
+          ),
+        );
+
+        const deploymentResult = await waitForLatestDeploymentUrl({
+          deploymentId: deployResult.deploymentId,
+          timeoutMs: 120000,
+          intervalMs: 2000,
+        });
+
+        liveUrl = deploymentResult?.url ?? liveUrl;
+      }
+
+      // Persist the deployment URL so the next editor load uses it.
+      if (liveUrl) {
+        writeCachedDeploymentUrl(TEMP_USER_ID, template.id, liveUrl);
+      }
+
+      setEditStatus("live");
+      updateMessageById(systemMessageId, {
+        text: "Configuration deployed.",
+        status: "live",
+      });
+      setEditStatus("idle");
+    } catch (err) {
+      updateMessageById(systemMessageId, {
+        role: "error",
+        text: err?.message ?? "Deployment failed",
         status: undefined,
       });
       setEditStatus("idle");
@@ -322,6 +386,7 @@ function Editor({ template }) {
         onConfigClose={handleCloseSidebar}
         editStatus={editStatus}
         onPromptSubmit={handlePromptSubmit}
+        onDeploy={handleDeployConfig}
         onBack={() => navigate("/")}
       />
 
