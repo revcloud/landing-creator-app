@@ -8,15 +8,11 @@ function InitLoader({ statusMessages, error }) {
             aria-hidden="true"
           />
           <div className="text-sm font-medium text-neutral-800">
-            Building your landing page...
+            Building changes...
           </div>
         </div>
 
-        {error && (
-          <div className="mt-4 text-sm text-red-600">
-            {error}
-          </div>
-        )}
+        {error && <div className="mt-4 text-sm text-red-600">{error}</div>}
 
         <div className="mt-4 space-y-2">
           {(statusMessages ?? []).map((m, idx) => (
@@ -31,4 +27,3 @@ function InitLoader({ statusMessages, error }) {
 }
 
 export default InitLoader;
-

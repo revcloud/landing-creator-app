@@ -15,17 +15,19 @@ function LeftPanel({
   onConfigClose,
   editStatus,
   onPromptSubmit,
+  onDeploy,
   onBack,
 }) {
-  const isPromptDisabled = editStatus !== "idle" || initStatus !== "ready";
-  const isConfigDisabled = editStatus !== "idle" || initStatus !== "ready";
-  console.log("messages", messages);
+  const isEditorUiLocked = editStatus !== "idle" || initStatus !== "ready";
   return (
     <div className="flex w-[360px] min-w-[360px] flex-col border-r border-neutral-200 bg-neutral-50">
       <TemplateInfoBar
         template={template}
         initStatus={initStatus}
         deploymentUrl={deploymentUrl}
+        editStatus={editStatus}
+        disabled={isEditorUiLocked}
+        onDeploy={onDeploy}
         onBack={onBack}
       />
 
@@ -50,14 +52,14 @@ function LeftPanel({
               config={config}
               onChange={onConfigChange}
               onClose={onConfigClose}
-              disabled={isConfigDisabled}
+              disabled={isEditorUiLocked}
             />
           </div>
         </div>
       </div>
 
       <PromptInput
-        disabled={isPromptDisabled}
+        disabled={isEditorUiLocked}
         onSubmit={(prompt) => onPromptSubmit?.(prompt)}
       />
     </div>

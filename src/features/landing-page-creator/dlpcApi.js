@@ -1,7 +1,5 @@
 const DLPC_API_BASE_URL = "https://api-stage.palisade.ai/api/dlpc";
 
-// Temporary auth token used by the existing implementation.
-// Centralized here so we can replace it later with real user auth.
 
 async function parseJsonSafely(text) {
   if (!text) return null;
@@ -19,6 +17,23 @@ async function postDlpcJson(path, body) {
       "Content-Type": "application/json",
     },
     body: JSON.stringify(body),
+  });
+
+  const text = await res.text();
+  const json = await parseJsonSafely(text);
+
+  if (!res.ok) {
+    const messageFromBody =
+      json?.error ?? json?.message ?? (typeof text === "string" ? text : "");
+    throw new Error(messageFromBody || "Request failed");
+  }
+
+  return json;
+}
+
+async function getDlpcJson(path) {
+  const res = await fetch(`${DLPC_API_BASE_URL}/${path}`, {
+    method: "GET",
   });
 
   const text = await res.text();
@@ -54,7 +69,7 @@ export async function deployTemplate({ templateId, config, userId }) {
 }
 
 export async function editTemplate({ templateId, prompt, userId }) {
-  // Backend contract: { templateId, prompt } -> { error, message, data.files, deploymentId? }
+  // Backend contract: { templateId, prompt } -> { error, message, data.commitSha, data.deploymentId? }
   const json = await postDlpcJson("ai-edit", { templateId, prompt, userId });
 
   const data = json?.data ?? {};
@@ -67,9 +82,84 @@ export async function editTemplate({ templateId, prompt, userId }) {
 
   return {
     url, // optional; for AI edit we typically don't need it
+    commitSha: data?.commitSha,
     deploymentId: data?.deploymentId,
     message: json?.message ?? "Edit submitted",
     error: error ?? false,
   };
 }
 
+export async function getLatestDeploymentUrl({ deploymentId }) {
+  const response = await getDlpcJson(
+    `latest-deployment-url/${encodeURIComponent(deploymentId)}`,
+  );
+  const data = response?.data ?? {};
+  const url = data?.url;
+  if (!url) {
+    throw new Error("No URL in latest deployment response");
+  }
+  return {
+    deploymentId: data?.deploymentId,
+    url,
+  };
+}
+
+export async function waitForLatestDeploymentUrl({
+  deploymentId,
+  timeoutMs = 120000,
+  intervalMs = 2000,
+}) {
+  if (!deploymentId) return false;
+  const startedAt = Date.now();
+  while (Date.now() - startedAt < timeoutMs) {
+    try {
+      const result = await getLatestDeploymentUrl({ deploymentId });
+      if (result?.url) {
+        return result;
+      }
+    } catch {
+      // Keep polling until timeout; deployment lookup may not be ready yet.
+    }
+
+    await new Promise((resolve) => window.setTimeout(resolve, intervalMs));
+  }
+
+  throw new Error("Timed out waiting for latest deployment URL");
+}
+
+export async function uploadDlpcFile(file) {
+  const res = await fetch(DLPC_API_BASE_URL + "/upload", {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+    },
+    body: JSON.stringify({ fileName: file.name }),
+  });
+
+  if (!res.ok) {
+    const errBody = await res.json().catch(() => ({}));
+    throw new Error(errBody.error ?? "Failed to get upload URL");
+  }
+
+  const json = await res.json();
+  const data = json?.data ?? {};
+
+  const putRes = await fetch(data.signedUrl, {
+    method: "PUT",
+    body: file,
+    headers: {
+      "Content-Type": file.type || "application/octet-stream",
+    },
+  });
+
+  if (!putRes.ok) throw new Error("Upload failed");
+  return data?.url;
+}
+
+/** Uploads a file and returns a `brand` config patch (`logo` or `favicon` URL). */
+export async function uploadDlpcBrandAsset(file, field) {
+  const url = await uploadDlpcFile(file);
+  if (field === "logo") return { logo: url };
+  if (field === "favicon") return { favicon: url };
+  throw new Error("Unknown brand asset field");
+}

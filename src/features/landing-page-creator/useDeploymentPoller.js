@@ -9,7 +9,7 @@ export function useDeploymentPoller() {
         const currentWait = {};
 
         const timeoutId = window.setTimeout(() => {
-          if (waiterRef.current !== currentWait) return;
+          if (waiterRef.current?.currentWait !== currentWait) return;
           waiterRef.current = null;
           reject(new Error("Timed out waiting for deployment to become live"));
         }, timeoutMs);
@@ -21,12 +21,6 @@ export function useDeploymentPoller() {
             if (waiterRef.current?.currentWait !== currentWait) return;
             waiterRef.current = null;
             resolve(value);
-          },
-          reject: (err) => {
-            window.clearTimeout(timeoutId);
-            if (waiterRef.current?.currentWait !== currentWait) return;
-            waiterRef.current = null;
-            reject(err);
           },
         };
       }),

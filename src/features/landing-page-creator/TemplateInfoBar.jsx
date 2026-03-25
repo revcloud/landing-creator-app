@@ -1,10 +1,20 @@
-function TemplateInfoBar({ template, initStatus, deploymentUrl, onBack }) {
+function TemplateInfoBar({
+  template,
+  initStatus,
+  deploymentUrl,
+  onBack,
+  onDeploy,
+  editStatus,
+  disabled,
+}) {
   const statusText =
     initStatus === "loading"
       ? "Initializing..."
       : initStatus === "error"
         ? "Initialization failed"
         : "Ready";
+
+  const isDeploying = editStatus === "submitting" || editStatus === "building";
 
   return (
     <div className="flex items-center justify-between gap-3 border-b border-neutral-200 p-2">
@@ -18,13 +28,24 @@ function TemplateInfoBar({ template, initStatus, deploymentUrl, onBack }) {
         </div>
       </div>
 
-      <button
-        type="button"
-        onClick={onBack}
-        className="shrink-0 rounded px-2 py-1 text-sm text-indigo-600 hover:text-indigo-800 focus:outline-none focus:ring-2 focus:ring-indigo-500"
-      >
-        ← Back
-      </button>
+      <div className="flex items-center gap-2">
+        <button
+          type="button"
+          onClick={onDeploy}
+          disabled={disabled}
+          className="shrink-0 rounded px-2 py-1 text-sm text-indigo-600 hover:text-indigo-800 focus:outline-none focus:ring-2 focus:ring-indigo-500 disabled:opacity-50 disabled:cursor-not-allowed"
+        >
+          {isDeploying ? "Deploying..." : "Deploy config"}
+        </button>
+
+        <button
+          type="button"
+          onClick={onBack}
+          className="shrink-0 rounded px-2 py-1 text-sm text-indigo-600 hover:text-indigo-800 focus:outline-none focus:ring-2 focus:ring-indigo-500"
+        >
+          ← Back
+        </button>
+      </div>
     </div>
   );
 }

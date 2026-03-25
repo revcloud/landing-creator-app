@@ -20,7 +20,7 @@ function PromptInput({ disabled, onSubmit }) {
           type="text"
           value={prompt}
           onChange={(e) => setPrompt(e.target.value)}
-          placeholder="Describe an edit for the landing page..."
+          placeholder="Describe the changes you want to make..."
           disabled={disabled}
           className="min-w-0 flex-1 rounded-md border border-neutral-300 px-3 py-2 text-sm text-neutral-900 focus:border-indigo-500 focus:outline-none focus:ring-1 focus:ring-indigo-500 disabled:bg-neutral-100 disabled:text-neutral-500"
         />
@@ -37,4 +37,3 @@ function PromptInput({ disabled, onSubmit }) {
 }
 
 export default PromptInput;
-
