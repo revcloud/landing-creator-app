@@ -19,10 +19,14 @@ export function usePostMessage({ previewOrigins, onTemplateReady, onElementClick
         window.location.origin,
         ...(previewOrigins ?? []),
       ];
-      if (!allowedOrigins.includes(event.origin)) return;
+      if (!allowedOrigins.includes(event.origin)) {
+        return;
+      }
 
       const message = parseMessageData(event.data);
-      if (!message?.type) return;
+      if (!message?.type) {
+        return;
+      }
 
       if (message.type === "TEMPLATE_READY") {
         onTemplateReady?.();

@@ -2,7 +2,12 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import InitLoader from "./InitLoader";
 import { defaultConfig } from "./constants";
-import { deployTemplate, editTemplate, initEditor } from "./dlpcApi";
+import {
+  deployTemplate,
+  editTemplate,
+  initEditor,
+  waitForLatestDeploymentUrl,
+} from "./dlpcApi";
 import {
   readCachedDeploymentUrl,
   writeCachedDeploymentUrl,
@@ -34,6 +39,7 @@ function Editor({ template }) {
   const [config, setConfig] = useState(defaultConfig);
   const [iframeReady, setIframeReady] = useState(false);
   const [iframeRefreshNonce, setIframeRefreshNonce] = useState(0);
+  const [currentDeploymentId, setCurrentDeploymentId] = useState(null);
 
   const [messages, setMessages] = useState([]);
   const [editStatus, setEditStatus] = useState("idle");
@@ -88,11 +94,19 @@ function Editor({ template }) {
       setActiveField(null);
       isProcessing.current = false;
       setConfig(defaultConfig);
+      setCurrentDeploymentId(null);
 
       const cachedUrl = readCachedDeploymentUrl(TEMP_USER_ID, template.id);
+      const fallbackPreviewUrl =
+        typeof template?.previewUrl === "string" && template.previewUrl
+          ? template.previewUrl
+          : null;
+      const initialUrl = cachedUrl || fallbackPreviewUrl;
       if (cachedUrl) {
-        // Warm load immediately. UI will still show the init overlay until fresh deploy is live.
+        // Warm load immediately.
         setDeploymentUrl(cachedUrl);
+      } else if (fallbackPreviewUrl) {
+        setDeploymentUrl(fallbackPreviewUrl);
       } else {
         setDeploymentUrl(null);
       }
@@ -104,22 +118,37 @@ function Editor({ template }) {
 
       try {
         pushStatus("Initializing editor...");
-        await initEditor({ userId: TEMP_USER_ID, templateId: template.id });
-
-        pushStatus("Deploying default configuration...");
-        const { url } = await deployTemplate({
-          templateId: template.id,
-          config: defaultConfig,
+        const response = await initEditor({
           userId: TEMP_USER_ID,
+          templateId: template.id,
         });
 
-        pushStatus("Waiting for deployment to become live...");
+        let url = response.data?.vercelProjectUrl || initialUrl;
+        let deployedNow = false;
+        if (!url) {
+          pushStatus("Deploying default configuration...");
+          const deployResult = await deployTemplate({
+            templateId: template.id,
+            config: defaultConfig,
+            userId: TEMP_USER_ID,
+          });
+          url = deployResult.url;
+          setCurrentDeploymentId(deployResult?.deploymentId ?? null);
+          deployedNow = true;
+        }
 
-        const readyPromise = waitForIframeTemplateReady({
-          timeoutMs: 120000,
-        });
-        setDeploymentUrl(url);
-        await readyPromise;
+        if (url !== deploymentUrl) {
+          setDeploymentUrl(url);
+        }
+
+        if (deployedNow) {
+          pushStatus("Waiting for deployment to become live...");
+          await waitForIframeTemplateReady({
+            timeoutMs: 120000,
+          });
+        } else {
+          pushStatus("Using existing deployment...");
+        }
 
         if (cancelled) return;
         writeCachedDeploymentUrl(TEMP_USER_ID, template.id, url);
@@ -148,6 +177,9 @@ function Editor({ template }) {
     typeof crypto?.randomUUID === "function"
       ? crypto.randomUUID()
       : `${Date.now()}-${Math.random()}`;
+
+  const sleep = (ms) =>
+    new Promise((resolve) => window.setTimeout(resolve, ms));
 
   const updateMessageById = (id, patch) => {
     setMessages((prev) =>
@@ -178,7 +210,7 @@ function Editor({ template }) {
     ]);
 
     try {
-      // This triggers the redeploy; we then wait until the iframe signals it is ready.
+      // AI edit commits files; Vercel deploy is triggered by that commit.
       const editResult = await editTemplate({
         templateId: template.id,
         prompt,
@@ -190,45 +222,89 @@ function Editor({ template }) {
         throw new Error(editResult?.message || "Edit failed");
       }
 
-      const readyPromise = waitForIframeTemplateReady({
-        timeoutMs: 120000,
-      });
-
-      // AI edit does not return a new deployment URL. Keep the existing one
-      // and just remount the iframe so the user sees repo changes.
-      const currentDeploymentUrl = deploymentUrl;
-
-      // Force a hard iframe remount even if the deployment URL stays the same,
-      // so the user sees the updated landing page.
-      setIframeRefreshNonce((n) => n + 1);
       setEditStatus("building");
       updateMessageById(systemMessageId, {
         text: "Building the updated landing page...",
         status: "building",
       });
-      await readyPromise;
 
-      if (currentDeploymentUrl) {
-        writeCachedDeploymentUrl(TEMP_USER_ID, template.id, currentDeploymentUrl);
+      // Backend may return a URL before Vercel finishes building; polling alone
+      // does not guarantee a frameable page. The retry loop below is required.
+      let liveUrl = editResult?.url ?? deploymentUrl;
+
+      if (editResult?.deploymentId) {
+        setCurrentDeploymentId(editResult.deploymentId);
+        updateMessageById(systemMessageId, {
+          text: "Waiting for Vercel deployment...",
+          status: "building",
+        });
+        try {
+          const deploymentResult = await waitForLatestDeploymentUrl({
+            deploymentId: editResult.deploymentId,
+            timeoutMs: 120000,
+            intervalMs: 2000,
+          });
+          if (deploymentResult?.url) {
+            liveUrl = deploymentResult.url;
+          }
+        } catch {
+          // Fall through — attempt to load whatever URL we have.
+        }
+      } else {
+        await sleep(2500);
+      }
+
+      if (liveUrl && liveUrl !== deploymentUrl) {
+        setDeploymentUrl(liveUrl);
+      }
+
+      // Retry loading the iframe — the deployment URL may exist before the
+      // build finishes and Vercel's "building" interstitial blocks iframes
+      // with X-Frame-Options: deny.  Each attempt remounts the iframe and
+      // waits a short window for the TEMPLATE_READY postMessage.
+      const MAX_RETRIES = 15;
+      const PER_ATTEMPT_TIMEOUT_MS = 8000;
+      const RETRY_DELAY_MS = 3000;
+      let iframeLoaded = false;
+
+      for (let attempt = 1; attempt <= MAX_RETRIES; attempt++) {
+        const readyPromise = waitForIframeTemplateReady({
+          timeoutMs: PER_ATTEMPT_TIMEOUT_MS,
+        });
+        setIframeRefreshNonce((n) => n + 1);
+        try {
+          await readyPromise;
+          iframeLoaded = true;
+          break;
+        } catch {
+          if (attempt < MAX_RETRIES) {
+            await sleep(RETRY_DELAY_MS);
+          }
+        }
+      }
+
+      if (!iframeLoaded) {
+        throw new Error("Deployment did not become ready in time");
+      }
+
+      if (liveUrl) {
+        writeCachedDeploymentUrl(TEMP_USER_ID, template.id, liveUrl);
       }
       setEditStatus("live");
       updateMessageById(systemMessageId, {
         text: "Your landing page is live.",
         status: "live",
-        url: currentDeploymentUrl,
+        url: liveUrl,
       });
 
       setEditStatus("idle");
     } catch (err) {
-      console.log("err", err);
       updateMessageById(systemMessageId, {
         role: "error",
         text: err?.message ?? "Edit failed",
         status: undefined,
       });
       setEditStatus("idle");
-    } finally {
-      // No-op: editStatus is handled in the try/catch paths.
     }
   };
 
@@ -252,8 +328,10 @@ function Editor({ template }) {
       <PreviewPane
         iframeRef={iframeRef}
         src={deploymentUrl ?? template?.previewUrl ?? ""}
-        iframeKey={`${deploymentUrl ?? template?.id}-${iframeRefreshNonce}`}
+        deploymentId={currentDeploymentId}
+        iframeKey={`${deploymentUrl ?? template?.id}-${currentDeploymentId ?? "no-deploy"}-${iframeRefreshNonce}`}
         nonce={iframeRefreshNonce}
+        ready={iframeReady}
       />
 
       {initStatus === "loading" && (

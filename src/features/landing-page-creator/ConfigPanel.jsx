@@ -1,45 +1,7 @@
 import { useEffect, useState } from "react";
+import { uploadDlpcBrandAsset } from "./dlpcApi";
 
-const UPLOAD_AUTH_TOKEN =
-  "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpZCI6MTgwLCJpYXQiOjE3NzMwODcxMDUsImV4cCI6MTc3MzE3MzUwNX0.i8uELrrHFYddutxqCFcbCcKEcpRC_Bl69oGxoThChpM";
-
-async function uploadDlpcFile(file) {
-  const res = await fetch("https://api-stage.palisade.ai/api/dlpc/upload", {
-    method: "POST",
-    headers: {
-      "Content-Type": "application/json",
-      "x-auth-token": UPLOAD_AUTH_TOKEN,
-    },
-    body: JSON.stringify({ fileName: file.name }),
-  });
-
-  if (!res.ok) {
-    const errBody = await res.json().catch(() => ({}));
-    throw new Error(errBody.error ?? "Failed to get upload URL");
-  }
-
-  const json = await res.json();
-  const data = json?.data ?? {};
-
-  const putRes = await fetch(data.signedUrl, {
-    method: "PUT",
-    body: file,
-    headers: {
-      "Content-Type": file.type || "application/octet-stream",
-    },
-  });
-
-  if (!putRes.ok) throw new Error("Upload failed");
-  return data?.url;
-}
-
-function ConfigPanel({
-  activeField,
-  config,
-  onChange,
-  onClose,
-  disabled,
-}) {
+function ConfigPanel({ activeField, config, onChange, onClose, disabled }) {
   const [uploadingField, setUploadingField] = useState(null);
   const [uploadError, setUploadError] = useState(null);
 
@@ -65,9 +27,8 @@ function ConfigPanel({
     setUploadError(null);
     setUploadingField(field);
     try {
-      const url = await uploadDlpcFile(file);
-      if (field === "logo") updateBrand({ logo: url });
-      if (field === "favicon") updateBrand({ favicon: url });
+      const patch = await uploadDlpcBrandAsset(file, field);
+      updateBrand(patch);
     } catch (err) {
       setUploadError(err?.message ?? "Upload failed");
     } finally {
@@ -242,4 +203,3 @@ function ConfigPanel({
 }
 
 export default ConfigPanel;
-
