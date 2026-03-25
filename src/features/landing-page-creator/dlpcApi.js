@@ -1,4 +1,4 @@
-const DLPC_API_BASE_URL = "https://palisade.ai/api/dlpc";
+const DLPC_API_BASE_URL = "https://api-stage.palisade.ai/api/dlpc";
 
 
 async function parseJsonSafely(text) {
