@@ -94,13 +94,13 @@ export async function getLatestDeploymentUrl({ deploymentId }) {
     `latest-deployment-url/${encodeURIComponent(deploymentId)}`,
   );
   const data = response?.data ?? {};
-  const url = data?.url;
-  if (!url) {
-    throw new Error("No URL in latest deployment response");
-  }
+  const url = data?.url ?? null;
   return {
-    deploymentId: data?.deploymentId,
+    deploymentId: data?.deploymentId ?? deploymentId,
     url,
+    readyState: data?.readyState ?? null,
+    readySubState: data?.readySubState ?? null,
+    aliasAssigned: Boolean(data?.aliasAssigned),
   };
 }
 
@@ -114,7 +114,9 @@ export async function waitForLatestDeploymentUrl({
   while (Date.now() - startedAt < timeoutMs) {
     try {
       const result = await getLatestDeploymentUrl({ deploymentId });
-      if (result?.url) {
+      const isReady =
+        result?.readyState === "ready" && result?.aliasAssigned === true;
+      if (isReady && result?.url) {
         return result;
       }
     } catch {
