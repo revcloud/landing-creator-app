@@ -135,10 +135,21 @@ function Editor({ template }) {
           url = deployResult.url;
           setCurrentDeploymentId(deployResult?.deploymentId ?? null);
           deployedNow = true;
+
+          if (deployResult?.deploymentId) {
+            const deploymentResult = await waitForLatestDeploymentUrl({
+              deploymentId: deployResult.deploymentId,
+              timeoutMs: 120000,
+              intervalMs: 2000,
+            });
+            if (deploymentResult?.url) {
+              url = deploymentResult.url;
+            }
+          }
         }
 
-        if (url !== deploymentUrl) {
-          setDeploymentUrl(url);
+        if (url) {
+          refreshPreviewWithUrl(url);
         }
 
         if (deployedNow) {
@@ -180,6 +191,13 @@ function Editor({ template }) {
 
   const sleep = (ms) =>
     new Promise((resolve) => window.setTimeout(resolve, ms));
+
+  const refreshPreviewWithUrl = (nextUrl) => {
+    if (!nextUrl) return;
+    setDeploymentUrl(nextUrl);
+    // Force iframe remount so PreviewPane appends a fresh cache-busting value.
+    setIframeRefreshNonce((n) => n + 1);
+  };
 
   const updateMessageById = (id, patch) => {
     setMessages((prev) =>
@@ -254,8 +272,8 @@ function Editor({ template }) {
         await sleep(2500);
       }
 
-      if (liveUrl && liveUrl !== deploymentUrl) {
-        setDeploymentUrl(liveUrl);
+      if (liveUrl) {
+        refreshPreviewWithUrl(liveUrl);
       }
 
       // Retry loading the iframe — the deployment URL may exist before the
@@ -332,6 +350,7 @@ function Editor({ template }) {
       });
 
       let liveUrl = deployResult?.url;
+      setCurrentDeploymentId(deployResult?.deploymentId ?? null);
 
       if (deployResult?.deploymentId) {
         setMessages((prev) =>
@@ -349,6 +368,10 @@ function Editor({ template }) {
         });
 
         liveUrl = deploymentResult?.url ?? liveUrl;
+      }
+
+      if (liveUrl) {
+        refreshPreviewWithUrl(liveUrl);
       }
 
       // Persist the deployment URL so the next editor load uses it.
