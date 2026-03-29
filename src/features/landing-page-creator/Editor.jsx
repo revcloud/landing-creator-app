@@ -17,7 +17,7 @@ import { usePostMessage } from "./usePostMessage";
 import LeftPanel from "./LeftPanel";
 import PreviewPane from "./PreviewPane";
 
-const TEMP_USER_ID = "4";
+const TEMP_USER_ID = "21";
 
 function safeOrigin(url) {
   if (typeof url !== "string" || !url) return null;
@@ -51,6 +51,11 @@ function Editor({ template }) {
   const { waitForIframeTemplateReady, notifyIframeTemplateReady } =
     useDeploymentPoller();
 
+  const markIframeReady = () => {
+    setIframeReady(true);
+    notifyIframeTemplateReady();
+  };
+
   const previewOrigins = useMemo(() => {
     return [safeOrigin(template?.previewUrl), safeOrigin(deploymentUrl)].filter(
       Boolean,
@@ -63,10 +68,7 @@ function Editor({ template }) {
 
   usePostMessage({
     previewOrigins,
-    onTemplateReady: () => {
-      setIframeReady(true);
-      notifyIframeTemplateReady();
-    },
+    onTemplateReady: markIframeReady,
     onElementClicked: (field) => {
       if (isProcessing.current) return;
       isProcessing.current = true;
@@ -256,25 +258,20 @@ function Editor({ template }) {
           text: "Waiting for Vercel deployment...",
           status: "building",
         });
-        try {
-          const deploymentResult = await waitForLatestDeploymentUrl({
-            deploymentId: editResult.deploymentId,
-            timeoutMs: 120000,
-            intervalMs: 2000,
-          });
-          if (deploymentResult?.url) {
-            liveUrl = deploymentResult.url;
-          }
-        } catch {
-          // Fall through — attempt to load whatever URL we have.
+        const deploymentResult = await waitForLatestDeploymentUrl({
+          deploymentId: editResult.deploymentId,
+          timeoutMs: 120000,
+          intervalMs: 2000,
+        });
+        if (deploymentResult?.url) {
+          liveUrl = deploymentResult.url;
         }
       } else {
         await sleep(2500);
       }
 
-      if (liveUrl) {
-        refreshPreviewWithUrl(liveUrl);
-      }
+      if (!liveUrl) throw new Error("Deployment URL is not available yet");
+      refreshPreviewWithUrl(liveUrl);
 
       // Retry loading the iframe — the deployment URL may exist before the
       // build finishes and Vercel's "building" interstitial blocks iframes
@@ -419,6 +416,7 @@ function Editor({ template }) {
         deploymentId={currentDeploymentId}
         iframeKey={`${deploymentUrl ?? template?.id}-${currentDeploymentId ?? "no-deploy"}-${iframeRefreshNonce}`}
         nonce={iframeRefreshNonce}
+        onLoad={markIframeReady}
         ready={iframeReady}
       />
 

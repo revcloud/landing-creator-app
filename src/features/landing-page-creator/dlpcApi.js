@@ -1,5 +1,16 @@
 const DLPC_API_BASE_URL = "https://api-stage.palisade.ai/api/dlpc";
 
+function normalizeDeploymentUrl(rawUrl) {
+  if (typeof rawUrl !== "string") return null;
+  const trimmed = rawUrl.trim();
+  if (!trimmed) return null;
+
+  // Backend may return hostnames without protocol.
+  if (!/^[a-zA-Z][a-zA-Z\d+\-.]*:\/\//.test(trimmed)) {
+    return `https://${trimmed}`;
+  }
+  return trimmed;
+}
 
 async function parseJsonSafely(text) {
   if (!text) return null;
@@ -58,7 +69,7 @@ export async function deployTemplate({ templateId, config, userId }) {
   const json = await postDlpcJson("deploy", { templateId, config, userId });
 
   const data = json?.data ?? {};
-  const url = data?.url ?? json?.url;
+  const url = normalizeDeploymentUrl(data?.url ?? json?.url);
   if (!url) throw new Error(json?.message || "No URL in deploy response");
 
   return {
@@ -73,7 +84,7 @@ export async function editTemplate({ templateId, prompt, userId }) {
   const json = await postDlpcJson("ai-edit", { templateId, prompt, userId });
 
   const data = json?.data ?? {};
-  const url = data?.url ?? json?.url;
+  const url = normalizeDeploymentUrl(data?.url ?? json?.url);
   const error = json?.error;
 
   if (error === true) {
@@ -89,18 +100,57 @@ export async function editTemplate({ templateId, prompt, userId }) {
   };
 }
 
+function normalizeLatestDeploymentPayload(data) {
+  const d = data ?? {};
+  const url = normalizeDeploymentUrl(
+    d.deploymentUrl ?? d.vercelUrl ?? d.url ?? d.previewUrl ?? null,
+  );
+
+  const rawReady =
+    d.readyState ?? d.ready_state ?? d.state ?? d.status ?? null;
+  const readyState =
+    rawReady == null
+      ? null
+      : String(rawReady).trim().toUpperCase();
+
+  const aliasRaw = d.aliasAssigned ?? d.alias_assigned;
+  const aliasAssigned =
+    typeof aliasRaw === "boolean"
+      ? aliasRaw
+      : aliasRaw == null
+        ? null
+        : Boolean(aliasRaw);
+
+  return {
+    deploymentId: d.deploymentId ?? d.deployment_id ?? null,
+    url,
+    readyState,
+    readySubState: d.readySubState ?? d.ready_sub_state ?? null,
+    aliasAssigned,
+  };
+}
+
+/** True when we should stop polling: stable URL + ready deployment state. */
+function isLatestDeploymentSettled(result) {
+  if (!result) return false;
+  if (!result.url) return false;
+  if (result.aliasAssigned === false) return false;
+  if (result.readyState == null) return true;
+  return result.readyState === "READY";
+}
+
 export async function getLatestDeploymentUrl({ deploymentId }) {
   const response = await getDlpcJson(
     `latest-deployment-url/${encodeURIComponent(deploymentId)}`,
   );
   const data = response?.data ?? {};
-  const url = data?.url ?? null;
+  const normalized = normalizeLatestDeploymentPayload(data);
   return {
-    deploymentId: data?.deploymentId ?? deploymentId,
-    url,
-    readyState: data?.readyState ?? null,
-    readySubState: data?.readySubState ?? null,
-    aliasAssigned: Boolean(data?.aliasAssigned),
+    deploymentId: normalized.deploymentId ?? deploymentId,
+    url: normalized.url,
+    readyState: normalized.readyState,
+    readySubState: normalized.readySubState,
+    aliasAssigned: normalized.aliasAssigned,
   };
 }
 
@@ -114,9 +164,7 @@ export async function waitForLatestDeploymentUrl({
   while (Date.now() - startedAt < timeoutMs) {
     try {
       const result = await getLatestDeploymentUrl({ deploymentId });
-      const isReady =
-        result?.readyState === "ready" && result?.aliasAssigned === true;
-      if (isReady && result?.url) {
+      if (isLatestDeploymentSettled(result)) {
         return result;
       }
     } catch {

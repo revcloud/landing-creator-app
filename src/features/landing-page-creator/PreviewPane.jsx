@@ -6,6 +6,7 @@ function PreviewPane({
   iframeKey,
   nonce,
   deploymentId,
+  onLoad,
   ready = true,
 }) {
   const cacheBustedSrc = useMemo(() => {
@@ -36,6 +37,7 @@ function PreviewPane({
         key={iframeKey}
         ref={iframeRef}
         src={cacheBustedSrc}
+        onLoad={onLoad}
         title="Template preview"
         className="h-full w-full border-0"
         sandbox="allow-scripts allow-same-origin"
