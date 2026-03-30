@@ -139,6 +139,10 @@ function isLatestDeploymentSettled(result) {
   return result.readyState === "READY";
 }
 
+function isLatestDeploymentErrored(result) {
+  return result?.readyState === "ERROR";
+}
+
 export async function getLatestDeploymentUrl({ deploymentId }) {
   const response = await getDlpcJson(
     `latest-deployment-url/${encodeURIComponent(deploymentId)}`,
@@ -162,13 +166,19 @@ export async function waitForLatestDeploymentUrl({
   if (!deploymentId) return false;
   const startedAt = Date.now();
   while (Date.now() - startedAt < timeoutMs) {
+    let result = null;
     try {
-      const result = await getLatestDeploymentUrl({ deploymentId });
-      if (isLatestDeploymentSettled(result)) {
-        return result;
-      }
+      result = await getLatestDeploymentUrl({ deploymentId });
     } catch {
       // Keep polling until timeout; deployment lookup may not be ready yet.
+    }
+
+    if (isLatestDeploymentErrored(result)) {
+      const details = result?.readySubState ? ` (${result.readySubState})` : "";
+      throw new Error(`Deployment entered ERROR state${details}`);
+    }
+    if (isLatestDeploymentSettled(result)) {
+      return result;
     }
 
     await new Promise((resolve) => window.setTimeout(resolve, intervalMs));
