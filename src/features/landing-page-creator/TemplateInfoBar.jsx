@@ -1,3 +1,10 @@
+import {
+  IoArrowBackOutline,
+  IoCloudUploadOutline,
+  IoReloadOutline,
+  IoSettingsOutline,
+} from "react-icons/io5";
+
 function TemplateInfoBar({
   template,
   initStatus,
@@ -25,8 +32,7 @@ function TemplateInfoBar({
           {template?.name ?? "Template"}
         </div>
         <div className="truncate text-xs text-neutral-500">
-          {statusText}{" "}
-          {deploymentUrl ? "• Deployed preview loaded" : ""}
+          {statusText} {deploymentUrl ? "• Deployed preview loaded" : ""}
         </div>
       </div>
 
@@ -35,26 +41,32 @@ function TemplateInfoBar({
           type="button"
           onClick={onOpenSettings}
           disabled={disabled}
+          title={settingsOpen ? "Close settings" : "Open settings"}
+          aria-label={settingsOpen ? "Close settings" : "Open settings"}
           className="shrink-0 rounded px-2 py-1 text-sm text-indigo-600 hover:text-indigo-800 focus:outline-none focus:ring-2 focus:ring-indigo-500 disabled:opacity-50 disabled:cursor-not-allowed"
         >
-          {settingsOpen ? "Settings open" : "Settings"}
+          <IoSettingsOutline />
         </button>
 
         <button
           type="button"
           onClick={onDeploy}
           disabled={disabled}
+          title={isDeploying ? "Deploying configuration" : "Deploy config"}
+          aria-label={isDeploying ? "Deploying configuration" : "Deploy config"}
           className="shrink-0 rounded px-2 py-1 text-sm text-indigo-600 hover:text-indigo-800 focus:outline-none focus:ring-2 focus:ring-indigo-500 disabled:opacity-50 disabled:cursor-not-allowed"
         >
-          {isDeploying ? "Deploying..." : "Deploy config"}
+          {isDeploying ? <IoReloadOutline /> : <IoCloudUploadOutline />}
         </button>
 
         <button
           type="button"
           onClick={onBack}
+          title="Back to template gallery"
+          aria-label="Back to template gallery"
           className="shrink-0 rounded px-2 py-1 text-sm text-indigo-600 hover:text-indigo-800 focus:outline-none focus:ring-2 focus:ring-indigo-500"
         >
-          ← Back
+          <IoArrowBackOutline />
         </button>
       </div>
     </div>
@@ -62,4 +74,3 @@ function TemplateInfoBar({
 }
 
 export default TemplateInfoBar;
-
