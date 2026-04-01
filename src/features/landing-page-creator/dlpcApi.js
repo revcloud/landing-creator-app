@@ -216,6 +216,33 @@ export async function uploadDlpcFile(file) {
   return data?.url;
 }
 
+export async function upsertDlpcProjectEnv({
+  userId,
+  projectName,
+  envValues,
+}) {
+  const response = await postDlpcJson("upsert-env", {
+    userId,
+    projectName,
+    envValues,
+  });
+
+  const data = response?.data ?? {};
+  const redeployId =
+    data?.redeploy?.id ??
+    data?.redeployId ??
+    data?.deploymentId ??
+    response?.redeploy?.id ??
+    response?.redeployId ??
+    response?.deploymentId ??
+    null;
+
+  return {
+    raw: response,
+    redeployId,
+  };
+}
+
 /** Uploads a file and returns a `brand` config patch (`logo` or `favicon` URL). */
 export async function uploadDlpcBrandAsset(file, field) {
   const url = await uploadDlpcFile(file);
