@@ -6,6 +6,7 @@ import {
   deployTemplate,
   editTemplate,
   initEditor,
+  upsertDlpcProjectEnv,
   waitForLatestDeploymentUrl,
 } from "./dlpcApi";
 import {
@@ -18,6 +19,11 @@ import LeftPanel from "./LeftPanel";
 import PreviewPane from "./PreviewPane";
 
 const TEMP_USER_ID = "21";
+const DEFAULT_ENV_SETTINGS = {
+  VITE_ENABLE_LANDING_PAGE_API: true,
+  VITE_ENABLE_GEOLOCATION: true,
+  VITE_ENABLE_IDENTITY_API: true,
+};
 
 function safeOrigin(url) {
   if (typeof url !== "string" || !url) return null;
@@ -45,6 +51,9 @@ function Editor({ template }) {
   const [editStatus, setEditStatus] = useState("idle");
 
   const [activeField, setActiveField] = useState(null);
+  const [settingsOpen, setSettingsOpen] = useState(false);
+  const [settingsSaving, setSettingsSaving] = useState(false);
+  const [envSettings, setEnvSettings] = useState(DEFAULT_ENV_SETTINGS);
   const iframeRef = useRef(null);
   const isProcessing = useRef(false);
 
@@ -72,6 +81,7 @@ function Editor({ template }) {
     onElementClicked: (field) => {
       if (isProcessing.current) return;
       isProcessing.current = true;
+      setSettingsOpen(false);
       setActiveField(field);
     },
   });
@@ -94,6 +104,9 @@ function Editor({ template }) {
       setMessages([]);
       setEditStatus("idle");
       setActiveField(null);
+      setSettingsOpen(false);
+      setSettingsSaving(false);
+      setEnvSettings(DEFAULT_ENV_SETTINGS);
       isProcessing.current = false;
       setConfig(defaultConfig);
       setCurrentDeploymentId(null);
@@ -184,6 +197,25 @@ function Editor({ template }) {
   const handleCloseSidebar = () => {
     isProcessing.current = false;
     setActiveField(null);
+  };
+
+  const handleOpenSettings = () => {
+    if (initStatus !== "ready") return;
+    if (editStatus !== "idle" || settingsSaving) return;
+    isProcessing.current = false;
+    setActiveField(null);
+    setSettingsOpen(true);
+  };
+
+  const handleCloseSettings = () => {
+    setSettingsOpen(false);
+  };
+
+  const handleEnvSettingChange = (key, value) => {
+    setEnvSettings((prev) => ({
+      ...prev,
+      [key]: Boolean(value),
+    }));
   };
 
   const createId = () =>
@@ -392,6 +424,87 @@ function Editor({ template }) {
     }
   };
 
+  const handleSaveSettings = async () => {
+    if (!template?.id || settingsSaving) return;
+
+    const systemMessageId = createId();
+    const userId = TEMP_USER_ID;
+    const siteId = "default";
+    const templateId = template.id;
+    const projectName = `landing-${userId}-${siteId}-${templateId}`;
+
+    setSettingsSaving(true);
+    setMessages((prev) => [
+      ...prev,
+      {
+        id: systemMessageId,
+        role: "system",
+        text: "Saving environment settings...",
+        status: "saving",
+      },
+    ]);
+
+    try {
+      const upsertResult = await upsertDlpcProjectEnv({
+        userId,
+        projectName,
+        envValues: {
+          VITE_ENABLE_LANDING_PAGE_API: String(
+            envSettings.VITE_ENABLE_LANDING_PAGE_API,
+          ),
+          VITE_ENABLE_GEOLOCATION: String(envSettings.VITE_ENABLE_GEOLOCATION),
+          VITE_ENABLE_IDENTITY_API: String(
+            envSettings.VITE_ENABLE_IDENTITY_API,
+          ),
+        },
+      });
+
+      const redeployId = upsertResult?.redeployId;
+      if (!redeployId) {
+        updateMessageById(systemMessageId, {
+          text: "Environment settings saved. No redeploy id returned.",
+          status: "live",
+        });
+        setSettingsOpen(false);
+        return;
+      }
+
+      updateMessageById(systemMessageId, {
+        text: "Environment settings saved. Waiting for redeploy...",
+        status: "building",
+      });
+
+      const deploymentResult = await waitForLatestDeploymentUrl({
+        deploymentId: redeployId,
+        timeoutMs: 120000,
+        intervalMs: 2000,
+      });
+
+      const liveUrl = deploymentResult?.url;
+      if (!liveUrl) {
+        throw new Error("Redeploy completed without a live URL");
+      }
+
+      setCurrentDeploymentId(redeployId);
+      refreshPreviewWithUrl(liveUrl);
+      writeCachedDeploymentUrl(TEMP_USER_ID, template.id, liveUrl);
+
+      updateMessageById(systemMessageId, {
+        text: "Environment settings saved and redeployed.",
+        status: "live",
+      });
+      setSettingsOpen(false);
+    } catch (err) {
+      updateMessageById(systemMessageId, {
+        role: "error",
+        text: err?.message ?? "Failed to save environment settings",
+        status: undefined,
+      });
+    } finally {
+      setSettingsSaving(false);
+    }
+  };
+
   return (
     <div className="relative flex h-screen flex-row">
       <LeftPanel
@@ -408,6 +521,13 @@ function Editor({ template }) {
         onPromptSubmit={handlePromptSubmit}
         onDeploy={handleDeployConfig}
         onBack={() => navigate("/")}
+        settingsOpen={settingsOpen}
+        onOpenSettings={handleOpenSettings}
+        onCloseSettings={handleCloseSettings}
+        envSettings={envSettings}
+        onEnvSettingChange={handleEnvSettingChange}
+        onSaveSettings={handleSaveSettings}
+        settingsSaving={settingsSaving}
       />
 
       <PreviewPane
