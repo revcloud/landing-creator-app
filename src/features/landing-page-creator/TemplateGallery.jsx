@@ -1,4 +1,8 @@
-function TemplateGallery({ templates, onSelect }) {
+import { useNavigate } from "react-router-dom";
+
+function TemplateGallery({ templates }) {
+  const navigate = useNavigate();
+
   return (
     <div className="min-h-screen bg-neutral-100 p-6">
       <div className="mx-auto max-w-6xl">
@@ -10,7 +14,11 @@ function TemplateGallery({ templates, onSelect }) {
             <button
               key={template.id}
               type="button"
-              onClick={() => onSelect(template)}
+              onClick={() =>
+                navigate("/template-variants", {
+                  state: { templateId: template.id },
+                })
+              }
               className="group relative flex flex-col overflow-hidden rounded-lg bg-white shadow-sm transition-shadow hover:shadow-md focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:ring-offset-2"
             >
               <div className="relative aspect-4/3 w-full overflow-hidden bg-neutral-200">

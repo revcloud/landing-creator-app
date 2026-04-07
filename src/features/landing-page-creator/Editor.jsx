@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from "react";
-import { useNavigate } from "react-router-dom";
+import { useLocation, useNavigate } from "react-router-dom";
 import InitLoader from "./InitLoader";
 import { defaultConfig } from "./constants";
 import {
@@ -36,6 +36,9 @@ function safeOrigin(url) {
 
 function Editor({ template }) {
   const navigate = useNavigate();
+  const location = useLocation();
+  const preloadedDeploymentUrl = location.state?.deploymentUrl;
+  const preloadedConfig = location.state?.config;
 
   const [initStatus, setInitStatus] = useState("loading"); // 'loading' | 'ready' | 'error'
   const [deploymentUrl, setDeploymentUrl] = useState(null);
@@ -96,6 +99,24 @@ function Editor({ template }) {
 
   useEffect(() => {
     let cancelled = false;
+
+    if (preloadedDeploymentUrl) {
+      setInitError(null);
+      setInitStatusMessages([]);
+      setMessages([]);
+      setEditStatus("idle");
+      setActiveField(null);
+      setSettingsOpen(false);
+      setSettingsSaving(false);
+      setEnvSettings(DEFAULT_ENV_SETTINGS);
+      isProcessing.current = false;
+      setConfig(preloadedConfig ?? defaultConfig);
+      setCurrentDeploymentId(null);
+      setDeploymentUrl(preloadedDeploymentUrl);
+      setIframeRefreshNonce((n) => n + 1);
+      setInitStatus("ready");
+      return;
+    }
 
     async function runInitAndDeploy() {
       setInitStatus("loading");
@@ -191,8 +212,8 @@ function Editor({ template }) {
     return () => {
       cancelled = true;
     };
-    // eslint-disable-next-line react-hooks/exhaustive-deps -- init depends on template.id
-  }, [template?.id]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- init depends on template.id and preloaded navigation state
+  }, [template?.id, preloadedDeploymentUrl]);
 
   const handleCloseSidebar = () => {
     isProcessing.current = false;
