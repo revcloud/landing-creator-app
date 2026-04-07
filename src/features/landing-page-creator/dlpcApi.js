@@ -59,6 +59,10 @@ async function getDlpcJson(path) {
   return json;
 }
 
+export async function getVariantConfigs(templateId) {
+  return getDlpcJson(`configs/${encodeURIComponent(templateId)}`);
+}
+
 export async function initEditor({ userId, templateId }) {
   // Backend contract from your spec: { userId, templateId }
   return postDlpcJson("init", { userId, templateId });
