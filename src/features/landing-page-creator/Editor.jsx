@@ -39,6 +39,7 @@ function Editor({ template }) {
   const location = useLocation();
   const preloadedDeploymentUrl = location.state?.deploymentUrl;
   const preloadedConfig = location.state?.config;
+  const variantId = String(location.state?.variantId ?? "default");
 
   const [initStatus, setInitStatus] = useState("loading"); // 'loading' | 'ready' | 'error'
   const [deploymentUrl, setDeploymentUrl] = useState(null);
@@ -132,7 +133,11 @@ function Editor({ template }) {
       setConfig(defaultConfig);
       setCurrentDeploymentId(null);
 
-      const cachedUrl = readCachedDeploymentUrl(TEMP_USER_ID, template.id);
+      const cachedUrl = readCachedDeploymentUrl(
+        TEMP_USER_ID,
+        template.id,
+        variantId,
+      );
       const fallbackPreviewUrl =
         typeof template?.previewUrl === "string" && template.previewUrl
           ? template.previewUrl
@@ -157,16 +162,19 @@ function Editor({ template }) {
         const response = await initEditor({
           userId: TEMP_USER_ID,
           templateId: template.id,
+          siteId: variantId,
         });
 
+        const workspaceFound = response?.message === "Workspace found";
         let url = response.data?.vercelProjectUrl || initialUrl;
         let deployedNow = false;
-        if (!url) {
+        if (!url && !workspaceFound) {
           pushStatus("Deploying default configuration...");
           const deployResult = await deployTemplate({
             templateId: template.id,
             config: defaultConfig,
             userId: TEMP_USER_ID,
+            variantId,
           });
           url = deployResult.url;
           setCurrentDeploymentId(deployResult?.deploymentId ?? null);
@@ -182,6 +190,8 @@ function Editor({ template }) {
               url = deploymentResult.url;
             }
           }
+        } else if (workspaceFound) {
+          pushStatus("Workspace found. Using existing deployment...");
         }
 
         if (url) {
@@ -198,7 +208,7 @@ function Editor({ template }) {
         }
 
         if (cancelled) return;
-        writeCachedDeploymentUrl(TEMP_USER_ID, template.id, url);
+        writeCachedDeploymentUrl(TEMP_USER_ID, template.id, url, variantId);
         setInitStatus("ready");
       } catch (err) {
         if (cancelled) return;
@@ -213,7 +223,7 @@ function Editor({ template }) {
       cancelled = true;
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps -- init depends on template.id and preloaded navigation state
-  }, [template?.id, preloadedDeploymentUrl]);
+  }, [template?.id, preloadedDeploymentUrl, variantId]);
 
   const handleCloseSidebar = () => {
     isProcessing.current = false;
@@ -288,6 +298,7 @@ function Editor({ template }) {
         templateId: template.id,
         prompt,
         userId: TEMP_USER_ID,
+        variantId,
       });
 
       const { error } = editResult ?? {};
@@ -356,7 +367,7 @@ function Editor({ template }) {
       }
 
       if (liveUrl) {
-        writeCachedDeploymentUrl(TEMP_USER_ID, template.id, liveUrl);
+        writeCachedDeploymentUrl(TEMP_USER_ID, template.id, liveUrl, variantId);
       }
       setEditStatus("live");
       updateMessageById(systemMessageId, {
@@ -397,6 +408,7 @@ function Editor({ template }) {
         templateId: template.id,
         config,
         userId: TEMP_USER_ID,
+        variantId,
       });
 
       let liveUrl = deployResult?.url;
@@ -426,7 +438,7 @@ function Editor({ template }) {
 
       // Persist the deployment URL so the next editor load uses it.
       if (liveUrl) {
-        writeCachedDeploymentUrl(TEMP_USER_ID, template.id, liveUrl);
+        writeCachedDeploymentUrl(TEMP_USER_ID, template.id, liveUrl, variantId);
       }
 
       setEditStatus("live");
@@ -450,7 +462,7 @@ function Editor({ template }) {
 
     const systemMessageId = createId();
     const userId = TEMP_USER_ID;
-    const siteId = "default";
+    const siteId = variantId;
     const templateId = template.id;
     const projectName = `landing-${userId}-${siteId}-${templateId}`;
 
@@ -508,7 +520,7 @@ function Editor({ template }) {
 
       setCurrentDeploymentId(redeployId);
       refreshPreviewWithUrl(liveUrl);
-      writeCachedDeploymentUrl(TEMP_USER_ID, template.id, liveUrl);
+      writeCachedDeploymentUrl(TEMP_USER_ID, template.id, liveUrl, variantId);
 
       updateMessageById(systemMessageId, {
         text: "Environment settings saved and redeployed.",

@@ -63,14 +63,19 @@ export async function getVariantConfigs(templateId) {
   return getDlpcJson(`configs/${encodeURIComponent(templateId)}`);
 }
 
-export async function initEditor({ userId, templateId }) {
-  // Backend contract from your spec: { userId, templateId }
-  return postDlpcJson("init", { userId, templateId });
+export async function initEditor({ userId, templateId, siteId = "default" }) {
+  // Backend contract: { userId, templateId, siteId }
+  return postDlpcJson("init", { userId, templateId, siteId });
 }
 
-export async function deployTemplate({ templateId, config, userId }) {
+export async function deployTemplate({ templateId, config, userId, variantId }) {
   // Backend contract from your spec: { templateId, config } -> { url, deploymentId? }
-  const json = await postDlpcJson("deploy", { templateId, config, userId });
+  const json = await postDlpcJson("deploy", {
+    templateId,
+    config,
+    userId,
+    siteId: variantId,
+  });
 
   const data = json?.data ?? {};
   const url = normalizeDeploymentUrl(data?.url ?? json?.url);
@@ -83,9 +88,14 @@ export async function deployTemplate({ templateId, config, userId }) {
   };
 }
 
-export async function editTemplate({ templateId, prompt, userId }) {
+export async function editTemplate({ templateId, prompt, userId, variantId }) {
   // Backend contract: { templateId, prompt } -> { error, message, data.commitSha, data.deploymentId? }
-  const json = await postDlpcJson("ai-edit", { templateId, prompt, userId });
+  const json = await postDlpcJson("ai-edit", {
+    templateId,
+    prompt,
+    userId,
+    siteId: variantId,
+  });
 
   const data = json?.data ?? {};
   const url = normalizeDeploymentUrl(data?.url ?? json?.url);
