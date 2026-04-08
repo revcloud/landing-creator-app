@@ -18,6 +18,16 @@ import VariantCard from "./VariantCard";
 
 const TEMP_USER_ID = "21";
 
+function getVariantId(config, index) {
+  const candidate =
+    config?.variantId ??
+    config?.id ??
+    config?.name ??
+    config?.slug ??
+    `variant-${index + 1}`;
+  return String(candidate);
+}
+
 export default function VariantSelector() {
   const navigate = useNavigate();
   const location = useLocation();
@@ -51,24 +61,26 @@ export default function VariantSelector() {
   const templateUrl =
     typeof template.previewUrl === "string" ? template.previewUrl : "";
 
-  const handleSelect = async (config) => {
+  const handleSelect = async (config, index) => {
     try {
       setSelecting(true);
       setSelectError(null);
       setSelectStatusMessages([]);
+      const variantId = getVariantId(config, index);
 
       const pushStatus = (m) => {
         setSelectStatusMessages((prev) => [...prev, m]);
       };
 
       pushStatus("Initializing editor...");
-      await initEditor({ userId: TEMP_USER_ID, templateId });
+      await initEditor({ userId: TEMP_USER_ID, templateId, siteId: variantId });
 
       pushStatus("Deploying selected variant...");
       const deployResult = await deployTemplate({
         templateId,
         config,
         userId: TEMP_USER_ID,
+        variantId,
       });
 
       let url = deployResult.url;
@@ -89,11 +101,12 @@ export default function VariantSelector() {
         throw new Error("No deployment URL returned");
       }
 
-      writeCachedDeploymentUrl(TEMP_USER_ID, templateId, url);
+      writeCachedDeploymentUrl(TEMP_USER_ID, templateId, url, variantId);
 
       navigate("/editor", {
         state: {
           templateId,
+          variantId,
           deploymentUrl: url,
           config,
         },
@@ -141,7 +154,7 @@ export default function VariantSelector() {
                 config={config}
                 templateUrl={templateUrl}
                 isInitiallyVisible={index < 3}
-                onSelect={handleSelect}
+                onSelect={(selectedConfig) => handleSelect(selectedConfig, index)}
                 selecting={selecting}
               />
             ))}
