@@ -73,28 +73,38 @@ export default function VariantSelector() {
       };
 
       pushStatus("Initializing editor...");
-      await initEditor({ userId: TEMP_USER_ID, templateId, siteId: variantId });
-
-      pushStatus("Deploying selected variant...");
-      const deployResult = await deployTemplate({
-        templateId,
-        config,
+      const initResponse = await initEditor({
         userId: TEMP_USER_ID,
-        variantId,
+        templateId,
+        siteId: variantId,
       });
+      const workspaceFound = initResponse?.message === "Workspace found";
 
-      let url = deployResult.url;
-
-      if (deployResult?.deploymentId) {
-        pushStatus("Waiting for deployment to become live...");
-        const deploymentResult = await waitForLatestDeploymentUrl({
-          deploymentId: deployResult.deploymentId,
-          timeoutMs: 120000,
-          intervalMs: 2000,
+      let url = initResponse?.data?.vercelProjectUrl || null;
+      if (!workspaceFound) {
+        pushStatus("Deploying selected variant...");
+        const deployResult = await deployTemplate({
+          templateId,
+          config,
+          userId: TEMP_USER_ID,
+          variantId,
         });
-        if (deploymentResult?.url) {
-          url = deploymentResult.url;
+
+        url = deployResult.url;
+
+        if (deployResult?.deploymentId) {
+          pushStatus("Waiting for deployment to become live...");
+          const deploymentResult = await waitForLatestDeploymentUrl({
+            deploymentId: deployResult.deploymentId,
+            timeoutMs: 120000,
+            intervalMs: 2000,
+          });
+          if (deploymentResult?.url) {
+            url = deploymentResult.url;
+          }
         }
+      } else {
+        pushStatus("Workspace found. Using existing deployment...");
       }
 
       if (!url) {

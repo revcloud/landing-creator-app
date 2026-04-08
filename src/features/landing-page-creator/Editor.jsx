@@ -165,9 +165,10 @@ function Editor({ template }) {
           siteId: variantId,
         });
 
+        const workspaceFound = response?.message === "Workspace found";
         let url = response.data?.vercelProjectUrl || initialUrl;
         let deployedNow = false;
-        if (!url) {
+        if (!url && !workspaceFound) {
           pushStatus("Deploying default configuration...");
           const deployResult = await deployTemplate({
             templateId: template.id,
@@ -189,6 +190,8 @@ function Editor({ template }) {
               url = deploymentResult.url;
             }
           }
+        } else if (workspaceFound) {
+          pushStatus("Workspace found. Using existing deployment...");
         }
 
         if (url) {
