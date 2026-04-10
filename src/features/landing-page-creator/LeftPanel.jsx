@@ -24,6 +24,10 @@ function LeftPanel({
   onEnvSettingChange,
   onSaveSettings,
   settingsSaving,
+  customDomain,
+  onCustomDomainChange,
+  onAddCustomDomain,
+  domainSaving,
 }) {
   const isEditorUiLocked =
     editStatus !== "idle" || initStatus !== "ready" || settingsSaving;
@@ -52,11 +56,11 @@ function LeftPanel({
         <div
           className={`border-t border-neutral-200 bg-white overflow-hidden transition-all duration-200 ease-out ${
             settingsOpen
-              ? "max-h-[320px] opacity-100 translate-y-0"
+              ? "max-h-[440px] opacity-100 translate-y-0"
               : "max-h-0 opacity-0 -translate-y-2 pointer-events-none"
           }`}
         >
-          <div className="p-4">
+          <div className="max-h-[440px] overflow-y-auto p-4">
             <div className="mb-3 flex items-center justify-between">
               <div className="text-sm font-semibold text-neutral-900">
                 Environment settings
@@ -83,7 +87,7 @@ function LeftPanel({
                   }
                   disabled={settingsSaving}
                 />
-                VITE_ENABLE_LANDING_PAGE_API
+                Enable Landing Page API
               </label>
               <label className="flex items-center gap-2 text-sm text-neutral-800">
                 <input
@@ -97,7 +101,7 @@ function LeftPanel({
                   }
                   disabled={settingsSaving}
                 />
-                VITE_ENABLE_GEOLOCATION
+                Enable Geolocation
               </label>
               <label className="flex items-center gap-2 text-sm text-neutral-800">
                 <input
@@ -111,7 +115,7 @@ function LeftPanel({
                   }
                   disabled={settingsSaving}
                 />
-                VITE_ENABLE_IDENTITY_API
+                Enable Identity API
               </label>
             </div>
 
@@ -124,6 +128,38 @@ function LeftPanel({
               >
                 {settingsSaving ? "Saving..." : "Save"}
               </button>
+            </div>
+
+            <div className="mt-5 border-t border-neutral-200 pt-4">
+              <div className="mb-2 text-sm font-semibold text-neutral-900">
+                Custom domain
+              </div>
+              <div className="space-y-2">
+                <input
+                  type="text"
+                  value={customDomain}
+                  onChange={(event) =>
+                    onCustomDomainChange?.(event.target.value)
+                  }
+                  placeholder="www.example.com"
+                  disabled={domainSaving || settingsSaving}
+                  className="w-full rounded border border-neutral-300 px-3 py-2 text-sm text-neutral-900 focus:border-indigo-500 focus:outline-none focus:ring-2 focus:ring-indigo-500 disabled:cursor-not-allowed disabled:bg-neutral-100"
+                />
+                <p className="text-xs text-neutral-500">
+                  We will add this domain to your Vercel project, then show DNS
+                  records to configure in cPanel.
+                </p>
+                <div className="flex justify-end">
+                  <button
+                    type="button"
+                    onClick={onAddCustomDomain}
+                    disabled={domainSaving || settingsSaving}
+                    className="rounded bg-neutral-900 px-3 py-1.5 text-sm font-medium text-white hover:bg-neutral-800 cursor-pointer focus:outline-none focus:ring-2 focus:ring-indigo-500 disabled:cursor-not-allowed disabled:opacity-50"
+                  >
+                    {domainSaving ? "Adding..." : "Add domain"}
+                  </button>
+                </div>
+              </div>
             </div>
           </div>
         </div>
