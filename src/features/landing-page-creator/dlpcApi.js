@@ -1,4 +1,5 @@
-const DLPC_API_BASE_URL = "https://api-stage.palisade.ai/api/dlpc";
+// const DLPC_API_BASE_URL = "https://api-stage.palisade.ai/api/dlpc";
+const DLPC_API_BASE_URL = "http://localhost:3500/api/dlpc";
 
 function normalizeDeploymentUrl(rawUrl) {
   if (typeof rawUrl !== "string") return null;
@@ -254,6 +255,33 @@ export async function upsertDlpcProjectEnv({
   return {
     raw: response,
     redeployId,
+  };
+}
+
+export async function addDlpcCustomDomain({
+  domain,
+  userId,
+  projectName,
+  vercelProjectId,
+}) {
+  const normalizedDomain =
+    typeof domain === "string" ? domain.trim().toLowerCase() : "";
+  if (!normalizedDomain) {
+    throw new Error("Domain is required");
+  }
+
+  const response = await postDlpcJson("custom-domain", {
+    domain: normalizedDomain,
+    userId,
+    projectName,
+    vercelProjectId: vercelProjectId || projectName,
+  });
+
+  return {
+    raw: response,
+    projectName:
+      response?.data?.projectName ?? projectName ?? vercelProjectId ?? null,
+    domain: response?.data?.domain ?? null,
   };
 }
 

@@ -3,6 +3,7 @@ import { useLocation, useNavigate } from "react-router-dom";
 import InitLoader from "./InitLoader";
 import { defaultConfig } from "./constants";
 import {
+  addDlpcCustomDomain,
   deployTemplate,
   editTemplate,
   initEditor,
@@ -57,6 +58,8 @@ function Editor({ template }) {
   const [activeField, setActiveField] = useState(null);
   const [settingsOpen, setSettingsOpen] = useState(false);
   const [settingsSaving, setSettingsSaving] = useState(false);
+  const [domainSaving, setDomainSaving] = useState(false);
+  const [customDomain, setCustomDomain] = useState("");
   const [envSettings, setEnvSettings] = useState(DEFAULT_ENV_SETTINGS);
   const iframeRef = useRef(null);
   const isProcessing = useRef(false);
@@ -109,6 +112,8 @@ function Editor({ template }) {
       setActiveField(null);
       setSettingsOpen(false);
       setSettingsSaving(false);
+      setDomainSaving(false);
+      setCustomDomain("");
       setEnvSettings(DEFAULT_ENV_SETTINGS);
       isProcessing.current = false;
       setConfig(preloadedConfig ?? defaultConfig);
@@ -128,6 +133,8 @@ function Editor({ template }) {
       setActiveField(null);
       setSettingsOpen(false);
       setSettingsSaving(false);
+      setDomainSaving(false);
+      setCustomDomain("");
       setEnvSettings(DEFAULT_ENV_SETTINGS);
       isProcessing.current = false;
       setConfig(defaultConfig);
@@ -538,6 +545,102 @@ function Editor({ template }) {
     }
   };
 
+  const getDomainSetupInstructions = (domain) => {
+    const normalized = String(domain || "").trim().toLowerCase();
+    if (!normalized) return "";
+    const hostParts = normalized.split(".");
+    const recordHost = hostParts.length > 2 ? hostParts[0] : "@";
+    const usesSubdomain = hostParts.length > 2;
+
+    if (usesSubdomain) {
+      return [
+        "Domain added to Vercel. Next, configure DNS in your cPanel zone editor:",
+        "",
+        `1) Add a CNAME record`,
+        `   - Name/Host: ${recordHost}`,
+        "   - Target/Points to: cname.vercel-dns.com",
+        "   - TTL: default (or 300)",
+        "",
+        "2) Remove conflicting A/AAAA/CNAME records for the same host if any exist.",
+        "3) Save changes in cPanel and wait for DNS propagation.",
+        "4) Return to Vercel and click Refresh/Verify if it still shows pending.",
+      ].join("\n");
+    }
+
+    return [
+      "Domain added to Vercel. Next, configure DNS in your cPanel zone editor:",
+      "",
+      "1) Add an A record",
+      "   - Name/Host: @",
+      "   - Value/Points to: 76.76.21.21",
+      "   - TTL: default (or 300)",
+      "",
+      "2) (Recommended) Add CNAME for www",
+      "   - Name/Host: www",
+      "   - Target: cname.vercel-dns.com",
+      "",
+      "3) Remove conflicting A/AAAA/CNAME records for the same host.",
+      "4) Save changes in cPanel and wait for DNS propagation.",
+      "5) Return to Vercel and click Refresh/Verify if it still shows pending.",
+    ].join("\n");
+  };
+
+  const handleAddCustomDomain = async () => {
+    if (!template?.id || domainSaving || settingsSaving) return;
+    const domain = customDomain.trim().toLowerCase();
+    if (!domain) {
+      setMessages((prev) => [
+        ...prev,
+        {
+          id: createId(),
+          role: "error",
+          text: "Please enter a domain (example: www.example.com).",
+        },
+      ]);
+      return;
+    }
+
+    const systemMessageId = createId();
+    const userId = TEMP_USER_ID;
+    const siteId = variantId;
+    const templateId = template.id;
+    const projectName = `landing-${userId}-${siteId}-${templateId}`;
+
+    setDomainSaving(true);
+    setMessages((prev) => [
+      ...prev,
+      {
+        id: systemMessageId,
+        role: "system",
+        text: `Adding custom domain "${domain}" to project...`,
+        status: "saving",
+      },
+    ]);
+
+    try {
+      await addDlpcCustomDomain({
+        domain,
+        userId,
+        projectName,
+        vercelProjectId: projectName,
+      });
+
+      updateMessageById(systemMessageId, {
+        text: getDomainSetupInstructions(domain),
+        status: "live",
+      });
+      setCustomDomain("");
+    } catch (err) {
+      updateMessageById(systemMessageId, {
+        role: "error",
+        text: err?.message ?? "Failed to add custom domain",
+        status: undefined,
+      });
+    } finally {
+      setDomainSaving(false);
+    }
+  };
+
   return (
     <div className="relative flex h-screen flex-row">
       <LeftPanel
@@ -561,6 +664,10 @@ function Editor({ template }) {
         onEnvSettingChange={handleEnvSettingChange}
         onSaveSettings={handleSaveSettings}
         settingsSaving={settingsSaving}
+        customDomain={customDomain}
+        onCustomDomainChange={setCustomDomain}
+        onAddCustomDomain={handleAddCustomDomain}
+        domainSaving={domainSaving}
       />
 
       <PreviewPane
