@@ -1,5 +1,5 @@
-// const DLPC_API_BASE_URL = "https://api-stage.palisade.ai/api/dlpc";
-const DLPC_API_BASE_URL = "http://localhost:3500/api/dlpc";
+const DLPC_API_BASE_URL = "https://api-stage.palisade.ai/api/dlpc";
+// const DLPC_API_BASE_URL = "http://localhost:3500/api/dlpc";
 
 function normalizeDeploymentUrl(rawUrl) {
   if (typeof rawUrl !== "string") return null;
