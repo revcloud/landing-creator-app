@@ -21,14 +21,14 @@ function TemplateGallery({ templates }) {
               }
               className="group relative flex flex-col overflow-hidden rounded-lg bg-white shadow-sm transition-shadow hover:shadow-md focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:ring-offset-2"
             >
-              <div className="relative aspect-4/3 w-full overflow-hidden bg-neutral-200">
+              <div className="relative w-full overflow-hidden bg-neutral-200">
                 <img
                   src={template.screenshot}
                   alt={template.name}
                   className="h-full w-full object-cover"
                   onError={(e) => {
-                    e.target.onerror = null
-                    e.target.src = '/vite.svg'
+                    e.target.onerror = null;
+                    e.target.src = "/vite.svg";
                   }}
                 />
                 <div className="absolute inset-0 flex items-center justify-center bg-black/40 opacity-0 transition-opacity group-hover:opacity-100">
@@ -45,7 +45,7 @@ function TemplateGallery({ templates }) {
         </div>
       </div>
     </div>
-  )
+  );
 }
 
-export default TemplateGallery
+export default TemplateGallery;
