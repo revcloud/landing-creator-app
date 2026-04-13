@@ -16,7 +16,7 @@ import { writeCachedDeploymentUrl } from "./editorStorage";
 import { useVariantConfigs } from "./useVariantConfigs";
 import VariantCard from "./VariantCard";
 
-const TEMP_USER_ID = "21";
+const TEMP_USER_ID = "66";
 
 function getVariantId(config, index) {
   const candidate =
@@ -34,9 +34,7 @@ export default function VariantSelector() {
   const [searchParams] = useSearchParams();
 
   const templateId = useMemo(() => {
-    return (
-      location.state?.templateId ?? searchParams.get("templateId") ?? null
-    );
+    return location.state?.templateId ?? searchParams.get("templateId") ?? null;
   }, [location.state?.templateId, searchParams]);
 
   const [selecting, setSelecting] = useState(false);
@@ -164,7 +162,9 @@ export default function VariantSelector() {
                 config={config}
                 templateUrl={templateUrl}
                 isInitiallyVisible={index < 3}
-                onSelect={(selectedConfig) => handleSelect(selectedConfig, index)}
+                onSelect={(selectedConfig) =>
+                  handleSelect(selectedConfig, index)
+                }
                 selecting={selecting}
               />
             ))}
@@ -178,7 +178,10 @@ export default function VariantSelector() {
 
       {selecting && (
         <div className="fixed inset-0 z-50">
-          <InitLoader statusMessages={selectStatusMessages} error={selectError} />
+          <InitLoader
+            statusMessages={selectStatusMessages}
+            error={selectError}
+          />
         </div>
       )}
     </div>

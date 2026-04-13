@@ -19,7 +19,7 @@ import { usePostMessage } from "./usePostMessage";
 import LeftPanel from "./LeftPanel";
 import PreviewPane from "./PreviewPane";
 
-const TEMP_USER_ID = "21";
+const TEMP_USER_ID = "66";
 const DEFAULT_ENV_SETTINGS = {
   VITE_ENABLE_LANDING_PAGE_API: true,
   VITE_ENABLE_GEOLOCATION: true,
@@ -546,7 +546,9 @@ function Editor({ template }) {
   };
 
   const getDomainSetupInstructions = (domain) => {
-    const normalized = String(domain || "").trim().toLowerCase();
+    const normalized = String(domain || "")
+      .trim()
+      .toLowerCase();
     if (!normalized) return "";
     const hostParts = normalized.split(".");
     const recordHost = hostParts.length > 2 ? hostParts[0] : "@";
